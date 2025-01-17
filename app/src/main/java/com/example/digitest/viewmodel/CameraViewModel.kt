@@ -12,20 +12,22 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import com.example.digitest.model.CameraRepository
+import com.example.digitest.model.IoExecutor
 import com.example.digitest.view.AlignmentOption
 import com.google.mlkit.vision.face.Face
+import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import javax.inject.Inject
 
-
-
-class CameraViewModel(application: Application) : AndroidViewModel(application) {
-
-    private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val cameraRepository = CameraRepository(application, Executors.newSingleThreadExecutor())
+@HiltViewModel
+class CameraViewModel @Inject constructor(
+    application: Application,
+    private val cameraRepository: CameraRepository,
+    @IoExecutor private val cameraExecutor: ExecutorService
+) : AndroidViewModel(application) {
 
     val isCaptureCompleted = mutableStateOf(false)
-    val alignmentState = mutableStateOf(AlignmentOption.Center)
+    private val alignmentState = mutableStateOf(AlignmentOption.Center)
     val capturedStates = mutableStateOf(
         mapOf(AlignmentOption.Center to false, AlignmentOption.Left to false, AlignmentOption.Right to false)
     )
