@@ -41,10 +41,12 @@ fun CameraScreen(
     viewModel: CameraViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    //PreviewView is used to show the live camera feed, integrated using AndroidView.
     val previewView = remember { PreviewView(context) }
     val activity = context as? Activity
     val lifecycleOwner = activity as? LifecycleOwner ?: return
 
+    // It runs some code inside a coroutine when the composable is first launched
     LaunchedEffect(Unit) {
         if (!viewModel.isCaptureCompleted.value) {
             viewModel.startCamera(previewView, lifecycleOwner) { detected, face ->

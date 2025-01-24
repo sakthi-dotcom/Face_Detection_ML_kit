@@ -29,7 +29,7 @@ class CameraRepository(private val context: Context, private val cameraExecutor:
         detector.process(inputImage)
             .addOnSuccessListener { faces ->
                 if (faces.isNotEmpty()) {
-                    onFaceDetected(true, faces[0]) // Process only the first face
+                    onFaceDetected(true, faces[0])
                 } else {
                     onFaceDetected(false, null)
                 }

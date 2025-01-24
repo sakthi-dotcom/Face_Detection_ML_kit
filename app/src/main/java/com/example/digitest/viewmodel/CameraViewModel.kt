@@ -19,6 +19,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.concurrent.ExecutorService
 import javax.inject.Inject
 
+
+//Handles the business logic and state management.
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     application: Application,
