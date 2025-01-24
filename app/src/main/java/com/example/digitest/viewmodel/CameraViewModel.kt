@@ -50,32 +50,31 @@ class CameraViewModel @Inject constructor(
     )
     val capturedImages: StateFlow<Map<AlignmentOption, Bitmap?>> get() = _capturedImages
 
-    private val _isCaptureCompleted = MutableStateFlow(false)
-
-    fun processFaceAlignment(face: Face,capturedFace: Bitmap) {
+    fun processFaceAlignment(face: Face,capturedFace: Bitmap,rotationDegrees: Int) {
         val yaw = face.headEulerAngleY
         when {
             alignmentState.value == AlignmentOption.Center && yaw in -15f..15f -> {
-                captureFace(AlignmentOption.Center,capturedFace)
+                captureFace(AlignmentOption.Center,capturedFace,rotationDegrees)
                 alignmentState.value = AlignmentOption.Left
                 instructionText.value = "Turn your face to the left"
             }
             alignmentState.value == AlignmentOption.Left && yaw < -15f -> {
-                captureFace(AlignmentOption.Left,capturedFace)
+                captureFace(AlignmentOption.Left,capturedFace,rotationDegrees)
                 alignmentState.value = AlignmentOption.Right
                 instructionText.value = "Turn your face to the right"
             }
             alignmentState.value == AlignmentOption.Right && yaw > 15f -> {
-                captureFace(AlignmentOption.Right,capturedFace)
+                captureFace(AlignmentOption.Right,capturedFace,rotationDegrees)
                 isCaptureCompleted.value = true
                 instructionText.value = "Face capture complete"
             }
         }
     }
 
-    private fun captureFace(alignment: AlignmentOption, capturedFace: Bitmap?) {
+    private fun captureFace(alignment: AlignmentOption, capturedFace: Bitmap?,rotationDegrees:Int) {
         capturedFace?.let {
-            val circularBitmap = createCircularBitmap(it)
+            val rotatedBitmap = rotateBitmap(it, rotationDegrees)
+            val circularBitmap = createCircularBitmap(rotatedBitmap)
             _capturedImages.value = _capturedImages.value.toMutableMap().apply {
                 this[alignment] = circularBitmap
             }
@@ -106,7 +105,7 @@ class CameraViewModel @Inject constructor(
     fun startCamera(
         previewView: PreviewView,
         lifecycleOwner: LifecycleOwner,
-        onFaceDetected: (Boolean, Face?, Bitmap?) -> Unit
+        onFaceDetected: (Boolean, Face?, Bitmap?,Int) -> Unit
     ) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(getApplication())
         cameraProviderFuture.addListener({
@@ -118,7 +117,8 @@ class CameraViewModel @Inject constructor(
             val imageAnalyzer = ImageAnalysis.Builder().build().also {
                 it.setAnalyzer(cameraExecutor) { image ->
                     cameraRepository.processImage(image) { detected, face, bitmap ->
-                        onFaceDetected(detected, face, bitmap)
+                        val rotationDegrees = image.imageInfo.rotationDegrees
+                        onFaceDetected(detected, face, bitmap,rotationDegrees)
                     }
                 }
             }
@@ -135,6 +135,11 @@ class CameraViewModel @Inject constructor(
         }, ContextCompat.getMainExecutor(getApplication()))
     }
 
+    private fun rotateBitmap(bitmap: Bitmap, rotationDegrees: Int): Bitmap {
+        val matrix = android.graphics.Matrix()
+        matrix.postRotate(rotationDegrees.toFloat())
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
 
     override fun onCleared() {
         super.onCleared()

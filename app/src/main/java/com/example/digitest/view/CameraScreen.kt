@@ -50,16 +50,17 @@ fun CameraScreen(
 
     LaunchedEffect(Unit) {
         if (!viewModel.isCaptureCompleted.value) {
-            viewModel.startCamera(previewView, lifecycleOwner) { detected, face, bitmap ->
+            viewModel.startCamera(previewView, lifecycleOwner) { detected, face, bitmap, rotationDegrees ->
                 viewModel.faceDetectedState.value = detected
                 face?.let {
                     if (bitmap != null) {
-                        viewModel.processFaceAlignment(it, bitmap)
+                        viewModel.processFaceAlignment(it, bitmap,rotationDegrees)
                     }
                 }
             }
         }
     }
+
 
 
     Column(
@@ -103,11 +104,7 @@ fun CameraScreen(
             AlignmentOption.values().forEach { alignment ->
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
-                        .background(
-                            if (viewModel.capturedStates.value[alignment] == true) Color.Green else Color.LightGray,
-                            RoundedCornerShape(8.dp)
-                        ),
+                        .size(80.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     if (viewModel.capturedImages.value[alignment] != null) {
