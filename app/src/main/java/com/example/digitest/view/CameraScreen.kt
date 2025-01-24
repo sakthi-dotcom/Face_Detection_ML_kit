@@ -2,6 +2,7 @@ package com.example.digitest.view
 
 import android.app.Activity
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,20 +44,23 @@ fun CameraScreen(
     viewModel: CameraViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    //PreviewView is used to show the live camera feed, integrated using AndroidView.
     val previewView = remember { PreviewView(context) }
     val activity = context as? Activity
     val lifecycleOwner = activity as? LifecycleOwner ?: return
 
-    // It runs some code inside a coroutine when the composable is first launched
     LaunchedEffect(Unit) {
         if (!viewModel.isCaptureCompleted.value) {
-            viewModel.startCamera(previewView, lifecycleOwner) { detected, face ->
+            viewModel.startCamera(previewView, lifecycleOwner) { detected, face, bitmap ->
                 viewModel.faceDetectedState.value = detected
-                face?.let { viewModel.processFaceAlignment(it) }
+                face?.let {
+                    if (bitmap != null) {
+                        viewModel.processFaceAlignment(it, bitmap)
+                    }
+                }
             }
         }
     }
+
 
     Column(
         modifier = Modifier
@@ -104,19 +110,30 @@ fun CameraScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(Icons.Default.Person, contentDescription = alignment.name)
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = alignment.name,
-                            color = Color.Black,
-                            textAlign = TextAlign.Center
+                    if (viewModel.capturedImages.value[alignment] != null) {
+                        Image(
+                            bitmap = viewModel.capturedImages.value[alignment]!!.asImageBitmap(),
+                            contentDescription = "Captured Face for ${alignment.name}",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
                         )
+                    } else {
+                        Column(
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Person, contentDescription = alignment.name)
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = alignment.name,
+                                color = Color.Black,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }

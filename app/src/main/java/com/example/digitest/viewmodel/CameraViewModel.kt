@@ -1,6 +1,13 @@
 package com.example.digitest.viewmodel
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -16,6 +23,8 @@ import com.example.digitest.model.IoExecutor
 import com.example.digitest.view.AlignmentOption
 import com.google.mlkit.vision.face.Face
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.ExecutorService
 import javax.inject.Inject
 
@@ -28,6 +37,7 @@ class CameraViewModel @Inject constructor(
     @IoExecutor private val cameraExecutor: ExecutorService
 ) : AndroidViewModel(application) {
 
+    private val _faceDetectedState = MutableStateFlow(false)
     val isCaptureCompleted = mutableStateOf(false)
     private val alignmentState = mutableStateOf(AlignmentOption.Center)
     val capturedStates = mutableStateOf(
@@ -35,38 +45,68 @@ class CameraViewModel @Inject constructor(
     )
     val instructionText = mutableStateOf("Keep your head straight")
     val faceDetectedState = mutableStateOf(false)
+    private val _capturedImages = MutableStateFlow(
+        AlignmentOption.values().associateWith { null as Bitmap? }
+    )
+    val capturedImages: StateFlow<Map<AlignmentOption, Bitmap?>> get() = _capturedImages
 
-    fun processFaceAlignment(face: Face) {
+    private val _isCaptureCompleted = MutableStateFlow(false)
+
+    fun processFaceAlignment(face: Face,capturedFace: Bitmap) {
         val yaw = face.headEulerAngleY
         when {
             alignmentState.value == AlignmentOption.Center && yaw in -15f..15f -> {
-                captureFace(AlignmentOption.Center)
+                captureFace(AlignmentOption.Center,capturedFace)
                 alignmentState.value = AlignmentOption.Left
                 instructionText.value = "Turn your face to the left"
             }
             alignmentState.value == AlignmentOption.Left && yaw < -15f -> {
-                captureFace(AlignmentOption.Left)
+                captureFace(AlignmentOption.Left,capturedFace)
                 alignmentState.value = AlignmentOption.Right
                 instructionText.value = "Turn your face to the right"
             }
             alignmentState.value == AlignmentOption.Right && yaw > 15f -> {
-                captureFace(AlignmentOption.Right)
+                captureFace(AlignmentOption.Right,capturedFace)
                 isCaptureCompleted.value = true
                 instructionText.value = "Face capture complete"
             }
         }
     }
 
-    private fun captureFace(alignment: AlignmentOption) {
-        capturedStates.value = capturedStates.value.toMutableMap().apply {
-            this[alignment] = true
+    private fun captureFace(alignment: AlignmentOption, capturedFace: Bitmap?) {
+        capturedFace?.let {
+            val circularBitmap = createCircularBitmap(it)
+            _capturedImages.value = _capturedImages.value.toMutableMap().apply {
+                this[alignment] = circularBitmap
+            }
+            capturedStates.value = capturedStates.value.toMutableMap().apply {
+                this[alignment] = true
+            }
         }
     }
+
+    private fun createCircularBitmap(bitmap: Bitmap?): Bitmap? {
+        if (bitmap == null) return null
+        val size = Math.min(bitmap.width, bitmap.height)
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint()
+        paint.isAntiAlias = true
+        val rect = Rect(0, 0, size, size)
+        canvas.drawARGB(0, 0, 0, 0)
+        paint.color = Color.BLACK
+        canvas.drawCircle((size / 2).toFloat(), (size / 2).toFloat(), (size / 2).toFloat(), paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(bitmap, rect, rect, paint)
+
+        return output
+    }
+
 
     fun startCamera(
         previewView: PreviewView,
         lifecycleOwner: LifecycleOwner,
-        onFaceDetected: (Boolean, Face?) -> Unit
+        onFaceDetected: (Boolean, Face?, Bitmap?) -> Unit
     ) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(getApplication())
         cameraProviderFuture.addListener({
@@ -77,8 +117,8 @@ class CameraViewModel @Inject constructor(
 
             val imageAnalyzer = ImageAnalysis.Builder().build().also {
                 it.setAnalyzer(cameraExecutor) { image ->
-                    cameraRepository.processImage(image) { detected, face ->
-                        onFaceDetected(detected, face)
+                    cameraRepository.processImage(image) { detected, face, bitmap ->
+                        onFaceDetected(detected, face, bitmap)
                     }
                 }
             }
@@ -94,6 +134,7 @@ class CameraViewModel @Inject constructor(
             }
         }, ContextCompat.getMainExecutor(getApplication()))
     }
+
 
     override fun onCleared() {
         super.onCleared()

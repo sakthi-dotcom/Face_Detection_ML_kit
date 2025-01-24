@@ -1,13 +1,17 @@
 package com.example.digitest.model
 
 import android.content.Context
-import androidx.annotation.OptIn
-import androidx.camera.core.ExperimentalGetImage
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 
 class CameraRepository(private val context: Context, private val cameraExecutor: ExecutorService) {
@@ -21,19 +25,31 @@ class CameraRepository(private val context: Context, private val cameraExecutor:
             .build()
     )
 
-    @OptIn(ExperimentalGetImage::class)
-    fun processImage(image: ImageProxy, onFaceDetected: (Boolean, Face?) -> Unit) {
+    fun processImage(image: ImageProxy, onFaceDetected: (Boolean, Face?, Bitmap?) -> Unit) {
         val mediaImage = image.image ?: return
         val inputImage = InputImage.fromMediaImage(mediaImage, image.imageInfo.rotationDegrees)
+        val bitmap = image.toBitmap()
 
         detector.process(inputImage)
             .addOnSuccessListener { faces ->
                 if (faces.isNotEmpty()) {
-                    onFaceDetected(true, faces[0])
+                    onFaceDetected(true, faces[0], bitmap)
                 } else {
-                    onFaceDetected(false, null)
+                    onFaceDetected(false, null, bitmap)
                 }
             }
             .addOnCompleteListener { image.close() }
     }
+
+    fun ImageProxy.toBitmap(): Bitmap {
+        val buffer = this.planes[0].buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+        val yuvImage = YuvImage(bytes, ImageFormat.NV21, this.width, this.height, null)
+        val outStream = ByteArrayOutputStream()
+        yuvImage.compressToJpeg(Rect(0, 0, this.width, this.height), 100, outStream)
+        val imageBytes = outStream.toByteArray()
+        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+    }
+
 }
