@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Rect
 import android.graphics.YuvImage
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
@@ -41,6 +43,7 @@ class CameraRepository(private val context: Context, private val cameraExecutor:
             .addOnCompleteListener { image.close() }
     }
 
+    @RequiresApi(Build.VERSION_CODES.FROYO)
     fun ImageProxy.toBitmap(): Bitmap {
         val buffer = this.planes[0].buffer
         val bytes = ByteArray(buffer.remaining())
